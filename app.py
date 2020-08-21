@@ -25,7 +25,6 @@ app = Flask(__name__)
 # Flask Routes
 @app.route("/")
 def welcome():
-    """List all available api routes."""
     return (
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
@@ -64,6 +63,7 @@ def tobs():
     session = Session(engine)
 
     # Query temp info
+    year_ago = dt.date(2017,8,23) - dt.timedelta(days=365)
     results = session.query(Measurement.tobs).filter(func.strftime(Measurement.date) > year_ago)
     session.close()
     
@@ -71,28 +71,32 @@ def tobs():
     temperature = {date:tobs for date,tobs in results}
     return jsonify(temperature)
 
-@app.route("/api/v1.0/start")
-def start():
-    # Create our session (link) from Python to the DB
-    session = Session(engine)
+@app.route("/api/v1.0/<start>")
+def trip1(start):
 
-    # Query all stations
-    start = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
-    session.close()
+ # go back one year from start date and go to end of data for Min/Avg/Max temp   
+    start_date= dt.datetime.strptime(start, '%Y-%m-%d')
+    last_year = dt.timedelta(days=365)
+    start = start_date-last_year
+    end =  dt.date(2017, 8, 23)
+    trip_data = session.query(func.min(Measurements.tobs), func.avg(Measurements.tobs), func.max(Measurements.tobs)).\
+        filter(Measurements.date >= start).filter(Measurements.date <= end).all()
+    trip = list(np.ravel(trip_data))
+    return jsonify(trip)
 
-    return jsonify(results)
+@app.route("/api/v1.0/<start>/<end>")
+def trip2(start,end):
 
-@app.route("/api/v1.0/start_end")
-def start_end():
-    # Create our session (link) from Python to the DB
-    session = Session(engine)
-
-    # Query temp info
-    results = session.query(Measurement.tobs).filter(func.strftime(Measurement.date) > year_ago)
-    session.close()
-    
-    # Convert list of tuples into normal list
-    return jsonify(results)
+  # go back one year from start/end date and get Min/Avg/Max temp     
+    start_date= dt.datetime.strptime(start, '%Y-%m-%d')
+    end_date= dt.datetime.strptime(end,'%Y-%m-%d')
+    last_year = dt.timedelta(days=365)
+    start = start_date-last_year
+    end = end_date-last_year
+    trip_data = session.query(func.min(Measurements.tobs), func.avg(Measurements.tobs), func.max(Measurements.tobs)).\
+        filter(Measurements.date >= start).filter(Measurements.date <= end).all()
+    trip = list(np.ravel(trip_data))
+    return jsonify(trip)
 
 if __name__ == '__main__':
     app.run(debug=True)
